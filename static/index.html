@@ -1,101 +1,285 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vehicle Telemetry Dashboard</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Vehicle Telemetry Dashboard</title>
+
+    <link rel="stylesheet" href="/static/style.css">
 </head>
+
 <body>
-  <main class="container">
-    <header class="hero">
-      <div>
-        <p class="eyebrow">VEHICLE TELEMETRY</p>
-        <h1>Braking State Monitor</h1>
-        <p class="subtitle">Speed and obstacle-distance monitoring from CSV telemetry.</p>
-      </div>
-      <div class="status"><span></span> API connected</div>
+
+<div class="container">
+
+    <header>
+        <h1>Vehicle Telemetry Dashboard</h1>
+        <p>Monitor vehicle speed, obstacle distance and braking state.</p>
     </header>
 
+
+    <!-- Summary Cards -->
+
     <section class="cards">
-      <article class="card">
-        <div class="label">CURRENT / LATEST SPEED</div>
-        <div id="latestSpeed" class="value">—</div>
-        <div class="unit">m/s</div>
-      </article>
-      <article class="card warning">
-        <div class="label">MINIMUM OBSTACLE DISTANCE</div>
-        <div id="minDistance" class="value">—</div>
-        <div class="unit">m</div>
-      </article>
-      <article class="card">
-        <div class="label">RECORDS</div>
-        <div id="records" class="value">—</div>
-        <div class="unit">telemetry points</div>
-      </article>
-      <article class="card">
-        <div class="label">BRAKING EVENTS</div>
-        <div id="brakingEvents" class="value">—</div>
-        <div class="unit">brakes_applied = 1</div>
-      </article>
-    </section>
 
-    <section class="panel filters">
-      <div class="panel-title">Filters</div>
-      <div class="filter-grid">
-        <label>
-          Brake status
-          <select id="brakeStatus">
-            <option value="all">All</option>
-            <option value="1">Brakes applied</option>
-            <option value="0">Brakes not applied</option>
-          </select>
-        </label>
-        <label>
-          Start date/time
-          <input id="startTime" type="datetime-local">
-        </label>
-        <label>
-          End date/time
-          <input id="endTime" type="datetime-local">
-        </label>
-        <button id="applyBtn">Apply filters</button>
-        <button id="resetBtn" class="secondary">Reset</button>
-      </div>
-      <div id="filterMessage" class="filter-message"></div>
-    </section>
+        <div class="card">
+            <div class="card-title">
+                CURRENT SPEED
+            </div>
 
-    <section class="charts">
-      <article class="panel chart-panel">
-        <div class="panel-heading">
-          <div>
-            <div class="panel-title">Speed over time</div>
-            <div class="muted">Vehicle speed · m/s · Scroll/pinch to zoom</div>
-          </div>
+            <div class="card-value" id="currentSpeed">
+                --
+            </div>
         </div>
-        <div class="chart-wrap"><canvas id="speedChart"></canvas></div>
-      </article>
 
-      <article class="panel chart-panel">
-        <div class="panel-heading">
-          <div>
-            <div class="panel-title">Obstacle distance over time</div>
-            <div class="muted">Distance to detected obstacle · m · Scroll/pinch to zoom</div>
-          </div>
+
+        <div class="card">
+            <div class="card-title">
+                MIN OBSTACLE DISTANCE
+            </div>
+
+            <div class="card-value" id="minDistance">
+                --
+            </div>
         </div>
-        <div class="chart-wrap"><canvas id="distanceChart"></canvas></div>
-      </article>
+
+
+        <div class="card">
+            <div class="card-title">
+                RECORDS
+            </div>
+
+            <div class="card-value" id="recordCount">
+                --
+            </div>
+        </div>
+
+
+        <div class="card">
+            <div class="card-title">
+                BRAKING EVENTS
+            </div>
+
+            <div class="card-value" id="brakingEvents">
+                --
+            </div>
+        </div>
+
     </section>
 
-    <footer>
-      <span id="datasetInfo">Loading dataset information…</span>
-      <a href="/docs" target="_blank">API documentation ↗</a>
-    </footer>
-  </main>
 
-  <script src="/static/app.js"></script>
+    <!-- Filters -->
+
+    <section class="filters">
+
+        <div class="filter-group">
+
+            <label for="brakeStatus">
+                Brake Status
+            </label>
+
+            <select id="brakeStatus">
+
+                <option value="all">
+                    All
+                </option>
+
+                <option value="1">
+                    Brakes Applied
+                </option>
+
+                <option value="0">
+                    Brakes Not Applied
+                </option>
+
+            </select>
+
+        </div>
+
+
+        <div class="filter-group">
+
+            <label for="startDate">
+                Start Time
+            </label>
+
+            <input
+                type="datetime-local"
+                id="startDate"
+            >
+
+        </div>
+
+
+        <div class="filter-group">
+
+            <label for="endDate">
+                End Time
+            </label>
+
+            <input
+                type="datetime-local"
+                id="endDate"
+            >
+
+        </div>
+
+
+        <button id="applyFilters">
+            Apply Filters
+        </button>
+
+
+        <button
+            id="resetFilters"
+            class="secondary"
+        >
+            Reset
+        </button>
+
+    </section>
+
+
+    <!-- Speed Chart -->
+
+    <section class="chart-card">
+
+        <div class="chart-header">
+
+            <div>
+
+                <h2>
+                    Speed Over Time
+                </h2>
+
+                <p>
+                    Vehicle speed in m/s
+                </p>
+
+            </div>
+
+
+            <div class="zoom-controls">
+
+                <button id="speedZoomIn">
+                    +
+                </button>
+
+                <button id="speedZoomOut">
+                    −
+                </button>
+
+                <button
+                    id="speedZoomReset"
+                    class="reset"
+                >
+                    Reset
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <div class="chart-wrapper">
+
+            <canvas id="speedChart"></canvas>
+
+        </div>
+
+
+        <div class="zoom-hint">
+            Use mouse wheel or pinch to zoom. Drag to move around the graph.
+        </div>
+
+    </section>
+
+
+    <!-- Obstacle Distance Chart -->
+
+    <section class="chart-card">
+
+        <div class="chart-header">
+
+            <div>
+
+                <h2>
+                    Obstacle Distance Over Time
+                </h2>
+
+                <p>
+                    Distance from nearest obstacle in meters
+                </p>
+
+            </div>
+
+
+            <div class="zoom-controls">
+
+                <button id="distanceZoomIn">
+                    +
+                </button>
+
+                <button id="distanceZoomOut">
+                    −
+                </button>
+
+                <button
+                    id="distanceZoomReset"
+                    class="reset"
+                >
+                    Reset
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <div class="chart-wrapper">
+
+            <canvas id="distanceChart"></canvas>
+
+        </div>
+
+
+        <div class="zoom-hint">
+            Use mouse wheel or pinch to zoom. Drag to move around the graph.
+        </div>
+
+    </section>
+
+</div>
+
+
+<!-- Chart.js -->
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+
+<!-- HammerJS -->
+
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+
+
+<!-- Chart.js Zoom Plugin -->
+
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
+
+
+<!-- Register Zoom Plugin -->
+
+<script>
+    Chart.register(ChartZoom);
+</script>
+
+
+<!-- Dashboard JavaScript -->
+
+<script src="/static/app.js"></script>
+
 </body>
+
 </html>
