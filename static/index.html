@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vehicle Telemetry Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
+</head>
+<body>
+  <main class="container">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">VEHICLE TELEMETRY</p>
+        <h1>Braking State Monitor</h1>
+        <p class="subtitle">Speed and obstacle-distance monitoring from CSV telemetry.</p>
+      </div>
+      <div class="status"><span></span> API connected</div>
+    </header>
+
+    <section class="cards">
+      <article class="card">
+        <div class="label">CURRENT / LATEST SPEED</div>
+        <div id="latestSpeed" class="value">—</div>
+        <div class="unit">m/s</div>
+      </article>
+      <article class="card warning">
+        <div class="label">MINIMUM OBSTACLE DISTANCE</div>
+        <div id="minDistance" class="value">—</div>
+        <div class="unit">m</div>
+      </article>
+      <article class="card">
+        <div class="label">RECORDS</div>
+        <div id="records" class="value">—</div>
+        <div class="unit">telemetry points</div>
+      </article>
+      <article class="card">
+        <div class="label">BRAKING EVENTS</div>
+        <div id="brakingEvents" class="value">—</div>
+        <div class="unit">brakes_applied = 1</div>
+      </article>
+    </section>
+
+    <section class="panel filters">
+      <div class="panel-title">Filters</div>
+      <div class="filter-grid">
+        <label>
+          Brake status
+          <select id="brakeStatus">
+            <option value="all">All</option>
+            <option value="1">Brakes applied</option>
+            <option value="0">Brakes not applied</option>
+          </select>
+        </label>
+        <label>
+          Start date/time
+          <input id="startTime" type="datetime-local">
+        </label>
+        <label>
+          End date/time
+          <input id="endTime" type="datetime-local">
+        </label>
+        <button id="applyBtn">Apply filters</button>
+        <button id="resetBtn" class="secondary">Reset</button>
+      </div>
+      <div id="filterMessage" class="filter-message"></div>
+    </section>
+
+    <section class="charts">
+      <article class="panel chart-panel">
+        <div class="panel-heading">
+          <div>
+            <div class="panel-title">Speed over time</div>
+            <div class="muted">Vehicle speed · m/s · Scroll/pinch to zoom</div>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="speedChart"></canvas></div>
+      </article>
+
+      <article class="panel chart-panel">
+        <div class="panel-heading">
+          <div>
+            <div class="panel-title">Obstacle distance over time</div>
+            <div class="muted">Distance to detected obstacle · m · Scroll/pinch to zoom</div>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="distanceChart"></canvas></div>
+      </article>
+    </section>
+
+    <footer>
+      <span id="datasetInfo">Loading dataset information…</span>
+      <a href="/docs" target="_blank">API documentation ↗</a>
+    </footer>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
