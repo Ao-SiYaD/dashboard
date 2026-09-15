@@ -3,25 +3,27 @@ let distanceChart = null;
 
 
 // ==========================================
-// HELPER
+// ELEMENT HELPER
 // ==========================================
 
-function getElement(id) {
+function el(id) {
     return document.getElementById(id);
 }
 
 
-function formatNumber(value) {
+// ==========================================
+// NUMBER FORMATTER
+// ==========================================
 
-    if (
-        value === null ||
-        value === undefined ||
-        !Number.isFinite(Number(value))
-    ) {
+function numberValue(value) {
+
+    const n = Number(value);
+
+    if (!Number.isFinite(n)) {
         return "--";
     }
 
-    return Number(value).toFixed(2);
+    return n.toFixed(2);
 }
 
 
@@ -29,25 +31,28 @@ function formatNumber(value) {
 // GET FILTERS
 // ==========================================
 
-function getFilters() {
+function getFilterQuery() {
 
     const params = new URLSearchParams();
 
-    const brakeStatus =
-        getElement("brakeStatus").value;
+
+    const brake =
+        el("brakeStatus").value;
+
 
     const start =
-        getElement("startDate").value;
+        el("startDate").value;
+
 
     const end =
-        getElement("endDate").value;
+        el("endDate").value;
 
 
-    if (brakeStatus !== "all") {
+    if (brake !== "all") {
 
         params.set(
             "brake_status",
-            brakeStatus
+            brake
         );
 
     }
@@ -74,23 +79,29 @@ function getFilters() {
 
 
     return params.toString();
+
 }
 
 
 // ==========================================
-// FETCH DATA
+// FETCH
 // ==========================================
 
-async function fetchJSON(url) {
+async function getJSON(url) {
 
     const response =
-        await fetch(url);
+        await fetch(
+            url,
+            {
+                cache: "no-store"
+            }
+        );
 
 
     if (!response.ok) {
 
         throw new Error(
-            `HTTP ${response.status}`
+            `Request failed: ${response.status}`
         );
 
     }
@@ -102,10 +113,50 @@ async function fetchJSON(url) {
 
 
 // ==========================================
+// TELEMETRY ARRAY
+// ==========================================
+
+function getTelemetryArray(data) {
+
+    if (Array.isArray(data)) {
+        return data;
+    }
+
+
+    if (
+        data &&
+        Array.isArray(data.telemetry)
+    ) {
+        return data.telemetry;
+    }
+
+
+    if (
+        data &&
+        Array.isArray(data.data)
+    ) {
+        return data.data;
+    }
+
+
+    if (
+        data &&
+        Array.isArray(data.records)
+    ) {
+        return data.records;
+    }
+
+
+    return [];
+
+}
+
+
+// ==========================================
 // CHART OPTIONS
 // ==========================================
 
-function getChartOptions(yAxisTitle) {
+function chartOptions(title) {
 
     return {
 
@@ -187,7 +238,6 @@ function getChartOptions(yAxisTitle) {
 
                 },
 
-
                 grid: {
 
                     color:
@@ -204,19 +254,17 @@ function getChartOptions(yAxisTitle) {
 
                     display: true,
 
-                    text: yAxisTitle,
+                    text: title,
 
                     color: "#8d9ab2"
 
                 },
-
 
                 ticks: {
 
                     color: "#8d9ab2"
 
                 },
-
 
                 grid: {
 
@@ -238,10 +286,15 @@ function getChartOptions(yAxisTitle) {
 // CREATE CHARTS
 // ==========================================
 
-function createCharts(rows) {
+function createCharts(data) {
+
+    if (!Array.isArray(data)) {
+        data = [];
+    }
+
 
     const labels =
-        rows.map(
+        data.map(
             row =>
                 new Date(
                     row.timestamp
@@ -250,14 +303,14 @@ function createCharts(rows) {
 
 
     const speeds =
-        rows.map(
+        data.map(
             row =>
                 Number(row.speed)
         );
 
 
     const distances =
-        rows.map(
+        data.map(
             row =>
                 Number(
                     row.obstacle_distance
@@ -265,7 +318,7 @@ function createCharts(rows) {
         );
 
 
-    // Destroy previous charts
+    // Destroy old charts
 
     if (speedChart) {
 
@@ -285,13 +338,13 @@ function createCharts(rows) {
     }
 
 
-    // ==================================
-    // SPEED CHART
-    // ==================================
+    // ======================================
+    // SPEED
+    // ======================================
 
     speedChart = new Chart(
 
-        getElement("speedChart"),
+        el("speedChart"),
 
         {
 
@@ -307,7 +360,7 @@ function createCharts(rows) {
                     {
 
                         label:
-                            "Vehicle Speed",
+                            "Speed",
 
                         data:
                             speeds,
@@ -318,11 +371,8 @@ function createCharts(rows) {
                         pointRadius:
                             0,
 
-                        pointHoverRadius:
-                            5,
-
                         tension:
-                            0.25
+                            0.2
 
                     }
 
@@ -332,7 +382,7 @@ function createCharts(rows) {
 
 
             options:
-                getChartOptions(
+                chartOptions(
                     "Speed (m/s)"
                 )
 
@@ -341,13 +391,13 @@ function createCharts(rows) {
     );
 
 
-    // ==================================
-    // DISTANCE CHART
-    // ==================================
+    // ======================================
+    // DISTANCE
+    // ======================================
 
     distanceChart = new Chart(
 
-        getElement("distanceChart"),
+        el("distanceChart"),
 
         {
 
@@ -374,11 +424,8 @@ function createCharts(rows) {
                         pointRadius:
                             0,
 
-                        pointHoverRadius:
-                            5,
-
                         tension:
-                            0.25
+                            0.2
 
                     }
 
@@ -388,106 +435,13 @@ function createCharts(rows) {
 
 
             options:
-                getChartOptions(
+                chartOptions(
                     "Distance (m)"
                 )
 
         }
 
     );
-
-}
-
-
-// ==========================================
-// ZOOM BUTTONS
-// ==========================================
-
-function setupZoomButtons() {
-
-
-    // SPEED ZOOM IN
-
-    getElement("speedZoomIn")
-        .onclick = function () {
-
-            if (speedChart) {
-
-                speedChart.zoom(1.25);
-
-            }
-
-        };
-
-
-    // SPEED ZOOM OUT
-
-    getElement("speedZoomOut")
-        .onclick = function () {
-
-            if (speedChart) {
-
-                speedChart.zoom(0.8);
-
-            }
-
-        };
-
-
-    // SPEED RESET
-
-    getElement("speedZoomReset")
-        .onclick = function () {
-
-            if (speedChart) {
-
-                speedChart.resetZoom();
-
-            }
-
-        };
-
-
-    // DISTANCE ZOOM IN
-
-    getElement("distanceZoomIn")
-        .onclick = function () {
-
-            if (distanceChart) {
-
-                distanceChart.zoom(1.25);
-
-            }
-
-        };
-
-
-    // DISTANCE ZOOM OUT
-
-    getElement("distanceZoomOut")
-        .onclick = function () {
-
-            if (distanceChart) {
-
-                distanceChart.zoom(0.8);
-
-            }
-
-        };
-
-
-    // DISTANCE RESET
-
-    getElement("distanceZoomReset")
-        .onclick = function () {
-
-            if (distanceChart) {
-
-                distanceChart.resetZoom();
-
-            }
-
-        };
 
 }
 
@@ -501,7 +455,7 @@ async function loadDashboard() {
     try {
 
         const query =
-            getFilters();
+            getFilterQuery();
 
 
         const suffix =
@@ -510,58 +464,82 @@ async function loadDashboard() {
                 : "";
 
 
-        // Load both APIs
-
-        const [
-            summary,
-            telemetry
-        ] = await Promise.all([
-
-            fetchJSON(
+        const summary =
+            await getJSON(
                 `/api/summary${suffix}`
-            ),
+            );
 
-            fetchJSON(
+
+        const telemetryResponse =
+            await getJSON(
                 `/api/telemetry${suffix}`
-            )
+            );
 
-        ]);
+
+        const telemetry =
+            getTelemetryArray(
+                telemetryResponse
+            );
+
+
+        console.log(
+            "SUMMARY:",
+            summary
+        );
+
+
+        console.log(
+            "TELEMETRY:",
+            telemetry
+        );
 
 
         // ==================================
-        // SUMMARY CARDS
+        // SUPPORT MULTIPLE BACKEND NAMES
         // ==================================
 
-        getElement(
-            "currentSpeed"
-        ).textContent =
-
-            `${formatNumber(
-                summary.latest_speed
-            )} m/s`;
+        const latestSpeed =
+            summary.latest_speed ??
+            summary.current_speed ??
+            summary.speed;
 
 
-        getElement(
-            "minDistance"
-        ).textContent =
-
-            `${formatNumber(
-                summary.minimum_obstacle_distance
-            )} m`;
+        const minimumDistance =
+            summary.minimum_obstacle_distance ??
+            summary.min_obstacle_distance ??
+            summary.min_distance;
 
 
-        getElement(
-            "recordCount"
-        ).textContent =
+        const records =
+            summary.records ??
+            summary.total_records ??
+            telemetry.length;
 
-            summary.records;
+
+        const brakingEvents =
+            summary.braking_events ??
+            summary.brakes_applied ??
+            0;
 
 
-        getElement(
-            "brakingEvents"
-        ).textContent =
+        // ==================================
+        // CARDS
+        // ==================================
 
-            summary.braking_events;
+        el("currentSpeed").textContent =
+            `${numberValue(latestSpeed)} m/s`;
+
+
+        el("minDistance").textContent =
+            `${numberValue(minimumDistance)} m`;
+
+
+        el("recordCount").textContent =
+            records;
+
+
+        el("brakingEvents").textContent =
+            brakingEvents;
 
 
         // ==================================
@@ -583,27 +561,19 @@ async function loadDashboard() {
         );
 
 
-        getElement(
-            "currentSpeed"
-        ).textContent =
+        el("currentSpeed").textContent =
             "--";
 
 
-        getElement(
-            "minDistance"
-        ).textContent =
+        el("minDistance").textContent =
             "--";
 
 
-        getElement(
-            "recordCount"
-        ).textContent =
+        el("recordCount").textContent =
             "--";
 
 
-        getElement(
-            "brakingEvents"
-        ).textContent =
+        el("brakingEvents").textContent =
             "--";
 
     }
@@ -612,56 +582,115 @@ async function loadDashboard() {
 
 
 // ==========================================
-// APPLY FILTERS
+// ZOOM BUTTONS
 // ==========================================
 
-getElement(
-    "applyFilters"
-).addEventListener(
-    "click",
+el("speedZoomIn").onclick =
+    function () {
+
+        if (speedChart) {
+
+            speedChart.zoom(1.25);
+
+        }
+
+    };
+
+
+el("speedZoomOut").onclick =
+    function () {
+
+        if (speedChart) {
+
+            speedChart.zoom(0.8);
+
+        }
+
+    };
+
+
+el("speedZoomReset").onclick =
+    function () {
+
+        if (speedChart) {
+
+            speedChart.resetZoom();
+
+        }
+
+    };
+
+
+el("distanceZoomIn").onclick =
+    function () {
+
+        if (distanceChart) {
+
+            distanceChart.zoom(1.25);
+
+        }
+
+    };
+
+
+el("distanceZoomOut").onclick =
+    function () {
+
+        if (distanceChart) {
+
+            distanceChart.zoom(0.8);
+
+        }
+
+    };
+
+
+el("distanceZoomReset").onclick =
+    function () {
+
+        if (distanceChart) {
+
+            distanceChart.resetZoom();
+
+        }
+
+    };
+
+
+// ==========================================
+// FILTER BUTTONS
+// ==========================================
+
+el("applyFilters").onclick =
     function () {
 
         loadDashboard();
 
-    }
-);
+    };
 
 
-// ==========================================
-// RESET FILTERS
-// ==========================================
-
-getElement(
-    "resetFilters"
-).addEventListener(
-    "click",
+el("resetFilters").onclick =
     function () {
 
-        getElement(
-            "brakeStatus"
-        ).value = "all";
+        el("brakeStatus").value =
+            "all";
 
 
-        getElement(
-            "startDate"
-        ).value = "";
+        el("startDate").value =
+            "";
 
 
-        getElement(
-            "endDate"
-        ).value = "";
+        el("endDate").value =
+            "";
 
 
         loadDashboard();
 
-    }
-);
+    };
 
 
 // ==========================================
 // START
 // ==========================================
-
-setupZoomButtons();
 
 loadDashboard();
