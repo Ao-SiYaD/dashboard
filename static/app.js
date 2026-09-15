@@ -2,36 +2,53 @@ let speedChart = null;
 let distanceChart = null;
 
 
-async function loadDashboard() {
+// ==========================================
+// HELPER
+// ==========================================
+
+const $ = (id) => document.getElementById(id);
+
+
+function formatNumber(value, digits = 2) {
+
+    if (
+        value === null ||
+        value === undefined ||
+        !Number.isFinite(Number(value))
+    ) {
+        return "—";
+    }
+
+    return Number(value).toFixed(digits);
+}
+
+
+// ==========================================
+// BUILD QUERY STRING
+// ==========================================
+
+function queryString() {
 
     const params = new URLSearchParams();
 
-
-    // Brake filter
-
-    const brakeStatus =
-        document.getElementById("brakeStatus").value;
+    const brake = $("brakeStatus").value;
+    const start = $("startTime").value;
+    const end = $("endTime").value;
 
 
-    if (brakeStatus !== "all") {
+    if (brake !== "all") {
 
-        params.append(
+        params.set(
             "brake_status",
-            brakeStatus
+            brake
         );
 
     }
 
 
-    // Start date
-
-    const start =
-        document.getElementById("startDate").value;
-
-
     if (start) {
 
-        params.append(
+        params.set(
             "start",
             new Date(start).toISOString()
         );
@@ -39,15 +56,9 @@ async function loadDashboard() {
     }
 
 
-    // End date
-
-    const end =
-        document.getElementById("endDate").value;
-
-
     if (end) {
 
-        params.append(
+        params.set(
             "end",
             new Date(end).toISOString()
         );
@@ -55,99 +66,193 @@ async function loadDashboard() {
     }
 
 
-    try {
-
-        const response =
-            await fetch(
-                `/api/summary?${params.toString()}`
-            );
+    return params.toString();
+}
 
 
-        if (!response.ok) {
+// ==========================================
+// FETCH JSON
+// ==========================================
 
-            throw new Error(
-                "Failed to load dashboard data"
-            );
+async function fetchJson(url) {
 
-        }
-
-
-        const data =
-            await response.json();
+    const response = await fetch(url);
 
 
-        // ==================================
-        // UPDATE SUMMARY CARDS
-        // ==================================
+    if (!response.ok) {
 
-        document.getElementById(
-            "currentSpeed"
-        ).textContent =
-            `${Number(data.current_speed).toFixed(2)} m/s`;
+        const text = await response.text();
 
-
-        document.getElementById(
-            "minDistance"
-        ).textContent =
-            `${Number(data.min_obstacle_distance).toFixed(2)} m`;
-
-
-        document.getElementById(
-            "recordCount"
-        ).textContent =
-            data.records;
-
-
-        document.getElementById(
-            "brakingEvents"
-        ).textContent =
-            data.braking_events;
-
-
-        // ==================================
-        // CREATE CHARTS
-        // ==================================
-
-        createCharts(data.telemetry);
-
-    }
-
-    catch (error) {
-
-        console.error(
-            "Dashboard error:",
-            error
+        throw new Error(
+            text || `HTTP ${response.status}`
         );
 
     }
+
+
+    return response.json();
+}
+
+
+// ==========================================
+// CHART OPTIONS
+// ==========================================
+
+function chartOptions(yTitle) {
+
+    return {
+
+        responsive: true,
+
+        maintainAspectRatio: false,
+
+
+        interaction: {
+
+            mode: "index",
+
+            intersect: false
+
+        },
+
+
+        plugins: {
+
+            legend: {
+
+                display: false
+
+            },
+
+
+            zoom: {
+
+                pan: {
+
+                    enabled: true,
+
+                    mode: "x"
+
+                },
+
+
+                zoom: {
+
+                    wheel: {
+
+                        enabled: true
+
+                    },
+
+
+                    pinch: {
+
+                        enabled: true
+
+                    },
+
+
+                    drag: {
+
+                        enabled: true
+
+                    },
+
+
+                    mode: "x"
+
+                }
+
+            }
+
+        },
+
+
+        scales: {
+
+            x: {
+
+                ticks: {
+
+                    color: "#8d9ab2",
+
+                    maxTicksLimit: 8
+
+                },
+
+
+                grid: {
+
+                    color:
+                        "rgba(141,154,178,.10)"
+
+                }
+
+            },
+
+
+            y: {
+
+                title: {
+
+                    display: true,
+
+                    text: yTitle,
+
+                    color: "#8d9ab2"
+
+                },
+
+
+                ticks: {
+
+                    color: "#8d9ab2"
+
+                },
+
+
+                grid: {
+
+                    color:
+                        "rgba(141,154,178,.10)"
+
+                }
+
+            }
+
+        }
+
+    };
 
 }
 
 
-function createCharts(data) {
+// ==========================================
+// UPDATE CHARTS
+// ==========================================
+
+function updateCharts(rows) {
+
+    const labels = rows.map(
+        row => new Date(
+            row.timestamp
+        ).toLocaleString()
+    );
 
 
-
-    const labels =
-        data.map(
-            item => item.timestamp
-        );
+    const speeds = rows.map(
+        row => Number(row.speed)
+    );
 
 
-    const speeds =
-        data.map(
-            item => Number(item.speed)
-        );
+    const distances = rows.map(
+        row => Number(
+            row.obstacle_distance
+        )
+    );
 
 
-    const distances =
-        data.map(
-            item => Number(
-                item.obstacle_distance
-            )
-        );
-
-
+    // Destroy previous charts
 
     if (speedChart) {
 
@@ -167,452 +272,452 @@ function createCharts(data) {
     }
 
 
+    // ==================================
+    // SPEED CHART
+    // ==================================
 
-    const speedCanvas =
-        document.getElementById(
-            "speedChart"
-        );
+    speedChart = new Chart(
+        $("speedChart"),
+        {
 
+            type: "line",
 
-    speedChart =
-        new Chart(
-            speedCanvas,
-            {
 
-                type: "line",
+            data: {
 
+                labels: labels,
 
-                data: {
 
-                    labels: labels,
+                datasets: [
 
+                    {
 
-                    datasets: [
+                        label: "Speed",
 
-                        {
+                        data: speeds,
 
-                            label:
-                                "Speed (m/s)",
+                        borderWidth: 2,
 
-                            data:
-                                speeds,
+                        pointRadius: 0,
 
-                            borderWidth:
-                                2,
+                        pointHoverRadius: 4,
 
-                            pointRadius:
-                                0,
-
-                            pointHoverRadius:
-                                4,
-
-                            tension:
-                                0.2
-
-                        }
-
-                    ]
-
-                },
-
-
-                options: {
-
-                    responsive: true,
-
-                    maintainAspectRatio: false,
-
-
-                    interaction: {
-
-                        mode:
-                            "index",
-
-                        intersect:
-                            false
-
-                    },
-
-
-                    scales: {
-
-                        x: {
-
-                            ticks: {
-
-                                maxTicksLimit:
-                                    10
-
-                            }
-
-                        },
-
-
-                        y: {
-
-                            title: {
-
-                                display:
-                                    true,
-
-                                text:
-                                    "Speed (m/s)"
-
-                            }
-
-                        }
-
-                    },
-
-
-                    plugins: {
-
-                        legend: {
-
-                            display:
-                                false
-
-                        },
-
-
-                        zoom: {
-
-                            pan: {
-
-                                enabled:
-                                    true,
-
-                                mode:
-                                    "x"
-
-                            },
-
-
-                            zoom: {
-
-                                wheel: {
-
-                                    enabled:
-                                        true
-
-                                },
-
-
-                                pinch: {
-
-                                    enabled:
-                                        true
-
-                                },
-
-
-                                drag: {
-
-                                    enabled:
-                                        true
-
-                                },
-
-
-                                mode:
-                                    "x"
-
-                            }
-
-                        }
+                        tension: 0.2
 
                     }
 
-                }
+                ]
 
-            }
-        );
+            },
 
 
+            options:
+                chartOptions(
+                    "Speed (m/s)"
+                )
 
-    const distanceCanvas =
-        document.getElementById(
-            "distanceChart"
-        );
-
-
-    distanceChart =
-        new Chart(
-            distanceCanvas,
-            {
-
-                type: "line",
-
-
-                data: {
-
-                    labels: labels,
-
-
-                    datasets: [
-
-                        {
-
-                            label:
-                                "Obstacle Distance (m)",
-
-                            data:
-                                distances,
-
-                            borderWidth:
-                                2,
-
-                            pointRadius:
-                                0,
-
-                            pointHoverRadius:
-                                4,
-
-                            tension:
-                                0.2
-
-                        }
-
-                    ]
-
-                },
-
-
-                options: {
-
-                    responsive: true,
-
-                    maintainAspectRatio: false,
-
-
-                    interaction: {
-
-                        mode:
-                            "index",
-
-                        intersect:
-                            false
-
-                    },
-
-
-                    scales: {
-
-                        x: {
-
-                            ticks: {
-
-                                maxTicksLimit:
-                                    10
-
-                            }
-
-                        },
-
-
-                        y: {
-
-                            title: {
-
-                                display:
-                                    true,
-
-                                text:
-                                    "Distance (m)"
-
-                            }
-
-                        }
-
-                    },
-
-
-                    plugins: {
-
-                        legend: {
-
-                            display:
-                                false
-
-                        },
-
-
-                        zoom: {
-
-                            pan: {
-
-                                enabled:
-                                    true,
-
-                                mode:
-                                    "x"
-
-                            },
-
-
-                            zoom: {
-
-                                wheel: {
-
-                                    enabled:
-                                        true
-
-                                },
-
-
-                                pinch: {
-
-                                    enabled:
-                                        true
-
-                                },
-
-
-                                drag: {
-
-                                    enabled:
-                                        true
-
-                                },
-
-
-                                mode:
-                                    "x"
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
-            }
-        );
-
-
-
-    setupZoomControls(
-        speedChart,
-        "speedZoomIn",
-        "speedZoomOut",
-        "speedZoomReset"
+        }
     );
 
 
-    setupZoomControls(
-        distanceChart,
-        "distanceZoomIn",
-        "distanceZoomOut",
-        "distanceZoomReset"
+    addZoomControls(
+        "speedChart",
+        speedChart
+    );
+
+
+    // ==================================
+    // DISTANCE CHART
+    // ==================================
+
+    distanceChart = new Chart(
+        $("distanceChart"),
+        {
+
+            type: "line",
+
+
+            data: {
+
+                labels: labels,
+
+
+                datasets: [
+
+                    {
+
+                        label:
+                            "Obstacle distance",
+
+                        data:
+                            distances,
+
+                        borderWidth: 2,
+
+                        pointRadius: 0,
+
+                        pointHoverRadius: 4,
+
+                        tension: 0.2
+
+                    }
+
+                ]
+
+            },
+
+
+            options:
+                chartOptions(
+                    "Distance (m)"
+                )
+
+        }
+    );
+
+
+    addZoomControls(
+        "distanceChart",
+        distanceChart
     );
 
 }
 
 
-function setupZoomControls(
-    chart,
-    zoomInId,
-    zoomOutId,
-    resetId
+// ==========================================
+// ZOOM CONTROLS
+// ==========================================
+
+function addZoomControls(
+    canvasId,
+    chart
 ) {
 
-    const zoomIn =
-        document.getElementById(
-            zoomInId
-        );
+    const canvas = $(canvasId);
+
+    const wrap =
+        canvas.closest(".chart-wrap");
 
 
-    const zoomOut =
-        document.getElementById(
-            zoomOutId
-        );
-
-
-    const reset =
-        document.getElementById(
-            resetId
-        );
-
-
-    // Zoom IN
-
-    if (zoomIn) {
-
-        zoomIn.onclick = function () {
-
-            chart.zoom(1.25);
-
-        };
-
+    if (!wrap) {
+        return;
     }
 
 
-    // Zoom OUT
+    // Remove old controls
 
-    if (zoomOut) {
+    const old =
+        wrap.querySelector(
+            ".zoom-controls"
+        );
 
-        zoomOut.onclick = function () {
+
+    if (old) {
+        old.remove();
+    }
+
+
+    // Container
+
+    const controls =
+        document.createElement("div");
+
+
+    controls.className =
+        "zoom-controls";
+
+
+    // Hint
+
+    const hint =
+        document.createElement("span");
+
+
+    hint.className =
+        "zoom-hint";
+
+
+    hint.textContent =
+        "Wheel / pinch: zoom";
+
+
+    // Button group
+
+    const group =
+        document.createElement("span");
+
+
+    group.className =
+        "zoom-buttons";
+
+
+    // Zoom out
+
+    const minus =
+        document.createElement("button");
+
+
+    minus.type = "button";
+
+    minus.textContent = "−";
+
+    minus.title = "Zoom out";
+
+    minus.setAttribute(
+        "aria-label",
+        "Zoom out"
+    );
+
+
+    minus.addEventListener(
+        "click",
+        () => {
 
             chart.zoom(0.8);
 
-        };
+        }
+    );
+
+
+    // Reset
+
+    const reset =
+        document.createElement("button");
+
+
+    reset.type = "button";
+
+    reset.textContent = "Reset";
+
+    reset.title = "Reset zoom";
+
+
+    reset.addEventListener(
+        "click",
+        () => {
+
+            chart.resetZoom();
+
+        }
+    );
+
+
+    // Zoom in
+
+    const plus =
+        document.createElement("button");
+
+
+    plus.type = "button";
+
+    plus.textContent = "+";
+
+    plus.title = "Zoom in";
+
+    plus.setAttribute(
+        "aria-label",
+        "Zoom in"
+    );
+
+
+    plus.addEventListener(
+        "click",
+        () => {
+
+            chart.zoom(1.25);
+
+        }
+    );
+
+
+    group.append(
+        minus,
+        reset,
+        plus
+    );
+
+
+    controls.append(
+        hint,
+        group
+    );
+
+
+    wrap.appendChild(
+        controls
+    );
+
+}
+
+
+// ==========================================
+// LOAD DASHBOARD
+// ==========================================
+
+async function loadDashboard() {
+
+    const qs =
+        queryString();
+
+
+    const suffix =
+        qs
+            ? `?${qs}`
+            : "";
+
+
+    $("filterMessage").textContent =
+        "Loading telemetry…";
+
+
+    try {
+
+        const [
+            summary,
+            rows
+        ] = await Promise.all([
+
+            fetchJson(
+                `/api/summary${suffix}`
+            ),
+
+            fetchJson(
+                `/api/telemetry${suffix}`
+            )
+
+        ]);
+
+
+        // ==================================
+        // IMPORTANT:
+        // These names MUST match main.py
+        // ==================================
+
+        $("latestSpeed").textContent =
+            formatNumber(
+                summary.latest_speed
+            );
+
+
+        $("minDistance").textContent =
+            formatNumber(
+                summary.minimum_obstacle_distance
+            );
+
+
+        $("records").textContent =
+            summary.records;
+
+
+        $("brakingEvents").textContent =
+            summary.braking_events;
+
+
+        // Charts
+
+        updateCharts(rows);
+
+
+        // Filter information
+
+        $("filterMessage").textContent =
+            `${summary.records} telemetry points match the selected filters.`;
 
     }
 
 
-    // RESET
+    catch (error) {
 
-    if (reset) {
+        console.error(
+            "Dashboard error:",
+            error
+        );
 
-        reset.onclick = function () {
 
-            chart.resetZoom();
-
-        };
+        $("filterMessage").textContent =
+            "Could not load telemetry. Check the CSV format and server logs.";
 
     }
 
 }
 
 
-document
-    .getElementById("applyFilters")
-    .addEventListener(
-        "click",
-        function () {
+// ==========================================
+// DATASET METADATA
+// ==========================================
 
-            loadDashboard();
+async function loadMetadata() {
 
-        }
-    );
+    try {
 
-
-document
-    .getElementById("resetFilters")
-    .addEventListener(
-        "click",
-        function () {
-
-            document.getElementById(
-                "brakeStatus"
-            ).value = "all";
+        const meta =
+            await fetchJson(
+                "/api/metadata"
+            );
 
 
-            document.getElementById(
-                "startDate"
-            ).value = "";
+        $("datasetInfo").textContent =
+            `${meta.rows} rows · ${meta.start} → ${meta.end} · speed: ${meta.speed_unit} · distance: ${meta.distance_unit}`;
+
+    }
 
 
-            document.getElementById(
-                "endDate"
-            ).value = "";
+    catch (error) {
+
+        console.error(
+            "Metadata error:",
+            error
+        );
 
 
-            loadDashboard();
+        $("datasetInfo").textContent =
+            "Dataset information unavailable.";
 
-        }
-    );
+    }
 
+}
+
+
+// ==========================================
+// APPLY FILTERS
+// ==========================================
+
+$("applyBtn").addEventListener(
+    "click",
+    loadDashboard
+);
+
+
+// ==========================================
+// RESET FILTERS
+// ==========================================
+
+$("resetBtn").addEventListener(
+    "click",
+    () => {
+
+        $("brakeStatus").value =
+            "all";
+
+
+        $("startTime").value =
+            "";
+
+
+        $("endTime").value =
+            "";
+
+
+        loadDashboard();
+
+    }
+);
+
+
+// ==========================================
+// INITIAL LOAD
+// ==========================================
+
+loadMetadata();
 
 loadDashboard();
