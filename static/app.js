@@ -1,142 +1,289 @@
-let speedChart = null;
-let distanceChart = null;
-
-const $ = (id) => document.getElementById(id);
-
-function formatNumber(value, digits = 2) {
-  if (value === null || value === undefined) return "—";
-  return Number(value).toFixed(digits);
-}
-
-function queryString() {
-  const params = new URLSearchParams();
-  const brake = $("brakeStatus").value;
-  const start = $("startTime").value;
-  const end = $("endTime").value;
-
-  if (brake !== "all") params.set("brake_status", brake);
-  if (start) params.set("start", new Date(start).toISOString());
-  if (end) params.set("end", new Date(end).toISOString());
-
-  return params.toString();
-}
-
-async function fetchJson(url) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `HTTP ${response.status}`);
-  }
-  return response.json();
-}
-
-function chartOptions(yTitle) {
-  return {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: { mode: "index", intersect: false },
-    plugins: {
-      legend: { display: false }
-    },
-    scales: {
-      x: {
-        ticks: { color: "#8d9ab2", maxTicksLimit: 8 },
-        grid: { color: "rgba(141,154,178,.10)" }
-      },
-      y: {
-        title: { display: true, text: yTitle, color: "#8d9ab2" },
-        ticks: { color: "#8d9ab2" },
-        grid: { color: "rgba(141,154,178,.10)" }
-      }
-    }
-  };
-}
-
-function updateCharts(rows) {
-  const labels = rows.map(r => new Date(r.timestamp).toLocaleString());
-  const speeds = rows.map(r => Number(r.speed));
-  const distances = rows.map(r => Number(r.obstacle_distance));
-
-  if (speedChart) speedChart.destroy();
-  if (distanceChart) distanceChart.destroy();
-
-  speedChart = new Chart($("speedChart"), {
-    type: "line",
-    data: {
-      labels,
-      datasets: [{
-        label: "Speed",
-        data: speeds,
-        borderWidth: 2,
-        pointRadius: 0,
-        tension: 0.2
-      }]
-    },
-    options: chartOptions("Speed (m/s)")
-  });
-
-  distanceChart = new Chart($("distanceChart"), {
-    type: "line",
-    data: {
-      labels,
-      datasets: [{
-        label: "Obstacle distance",
-        data: distances,
-        borderWidth: 2,
-        pointRadius: 0,
-        tension: 0.2
-      }]
-    },
-    options: chartOptions("Distance (m)")
-  });
-}
+let speedChart;
+let distanceChart;
 
 async function loadDashboard() {
-  const qs = queryString();
-  const suffix = qs ? `?${qs}` : "";
+    const params = new URLSearchParams();
 
-  $("filterMessage").textContent = "Loading telemetry…";
+    const brakeStatus = document.getElementById("brakeStatus").value;
+    const start = document.getElementById("startDate").value;
+    const end = document.getElementById("endDate").value;
 
-  try {
-    const [summary, rows] = await Promise.all([
-      fetchJson(`/api/summary${suffix}`),
-      fetchJson(`/api/telemetry${suffix}`)
-    ]);
+    if (brakeStatus !== "all") {
+        params.append("brake_status", brakeStatus);
+    }
 
-    $("latestSpeed").textContent = formatNumber(summary.latest_speed);
-    $("minDistance").textContent = formatNumber(summary.minimum_obstacle_distance);
-    $("records").textContent = summary.records;
-    $("brakingEvents").textContent = summary.braking_events;
+    if (start) {
+        params.append("start", new Date(start).toISOString());
+    }
 
-    updateCharts(rows);
+    if (end) {
+        params.append("end", new Date(end).toISOString());
+    }
 
-    $("filterMessage").textContent =
-      `${summary.records} telemetry points match the selected filters.`;
-  } catch (error) {
-    console.error(error);
-    $("filterMessage").textContent =
-      "Could not load telemetry. Check the CSV format and server logs.";
-  }
+    try {
+        const response = await fetch(`/api/summary?${params.toString()}`);
+
+        if (!response.ok) {
+            throw new Error("Failed to load dashboard data");
+        }
+
+        const data = await response.json();
+
+        document.getElementById("currentSpeed").textContent =
+            `${Number(data.current_speed).toFixed(2)} m/s`;
+
+        document.getElementById("minDistance").textContent =
+            `${Number(data.min_obstacle_distance).toFixed(2)} m`;
+
+        document.getElementById("recordCount").textContent =
+            data.records;
+
+        document.getElementById("brakingEvents").textContent =
+            data.braking_events;
+
+        createCharts(data.telemetry);
+
+    } catch (error) {
+        console.error(error);
+    }
 }
 
-async function loadMetadata() {
-  try {
-    const meta = await fetchJson("/api/metadata");
-    $("datasetInfo").textContent =
-      `${meta.rows} rows · ${meta.start} → ${meta.end} · speed: ${meta.speed_unit} · distance: ${meta.distance_unit}`;
-  } catch {
-    $("datasetInfo").textContent = "Dataset information unavailable.";
-  }
+
+function createCharts(data) {
+    const labels = data.map(item => item.timestamp);
+
+    const speeds = data.map(item => Number(item.speed));
+
+    const distances = data.map(
+        item => Number(item.obstacle_distance)
+    );
+
+
+    // Destroy old charts before creating new ones
+    if (speedChart) {
+        speedChart.destroy();
+    }
+
+    if (distanceChart) {
+        distanceChart.destroy();
+    }
+
+
+    // Speed Chart
+    const speedCanvas =
+        document.getElementById("speedChart");
+
+    speedChart = new Chart(speedCanvas, {
+        type: "line",
+
+        data: {
+            labels: labels,
+
+            datasets: [{
+                label: "Speed (m/s)",
+                data: speeds,
+
+                borderWidth: 2,
+                pointRadius: 0,
+                tension: 0.2
+            }]
+        },
+
+        options: {
+            responsive: true,
+
+            interaction: {
+                mode: "index",
+                intersect: false
+            },
+
+            scales: {
+                x: {
+                    ticks: {
+                        maxTicksLimit: 10
+                    }
+                },
+
+                y: {
+                    title: {
+                        display: true,
+                        text: "Speed (m/s)"
+                    }
+                }
+            },
+
+            plugins: {
+                legend: {
+                    display: false
+                },
+
+                zoom: {
+                    pan: {
+                        enabled: true,
+                        mode: "x",
+                        modifierKey: "shift"
+                    },
+
+                    zoom: {
+                        wheel: {
+                            enabled: true
+                        },
+
+                        pinch: {
+                            enabled: true
+                        },
+
+                        drag: {
+                            enabled: true
+                        },
+
+                        mode: "x"
+                    }
+                }
+            }
+        }
+    });
+
+
+    // Distance Chart
+    const distanceCanvas =
+        document.getElementById("distanceChart");
+
+    distanceChart = new Chart(distanceCanvas, {
+        type: "line",
+
+        data: {
+            labels: labels,
+
+            datasets: [{
+                label: "Obstacle Distance (m)",
+                data: distances,
+
+                borderWidth: 2,
+                pointRadius: 0,
+                tension: 0.2
+            }]
+        },
+
+        options: {
+            responsive: true,
+
+            interaction: {
+                mode: "index",
+                intersect: false
+            },
+
+            scales: {
+                x: {
+                    ticks: {
+                        maxTicksLimit: 10
+                    }
+                },
+
+                y: {
+                    title: {
+                        display: true,
+                        text: "Distance (m)"
+                    }
+                }
+            },
+
+            plugins: {
+                legend: {
+                    display: false
+                },
+
+                zoom: {
+                    pan: {
+                        enabled: true,
+                        mode: "x",
+                        modifierKey: "shift"
+                    },
+
+                    zoom: {
+                        wheel: {
+                            enabled: true
+                        },
+
+                        pinch: {
+                            enabled: true
+                        },
+
+                        drag: {
+                            enabled: true
+                        },
+
+                        mode: "x"
+                    }
+                }
+            }
+        }
+    });
+
+
+    // Zoom buttons
+    setupZoomControls(
+        speedChart,
+        "speedZoomIn",
+        "speedZoomOut",
+        "speedZoomReset"
+    );
+
+    setupZoomControls(
+        distanceChart,
+        "distanceZoomIn",
+        "distanceZoomOut",
+        "distanceZoomReset"
+    );
 }
 
-$("applyBtn").addEventListener("click", loadDashboard);
 
-$("resetBtn").addEventListener("click", () => {
-  $("brakeStatus").value = "all";
-  $("startTime").value = "";
-  $("endTime").value = "";
-  loadDashboard();
-});
+function setupZoomControls(
+    chart,
+    zoomInId,
+    zoomOutId,
+    resetId
+) {
+    const zoomIn = document.getElementById(zoomInId);
+    const zoomOut = document.getElementById(zoomOutId);
+    const reset = document.getElementById(resetId);
 
-loadMetadata();
+    if (zoomIn) {
+        zoomIn.onclick = () => {
+            chart.zoom(1.25);
+        };
+    }
+
+    if (zoomOut) {
+        zoomOut.onclick = () => {
+            chart.zoom(0.8);
+        };
+    }
+
+    if (reset) {
+        reset.onclick = () => {
+            chart.resetZoom();
+        };
+    }
+}
+
+
+// Apply filters
+document.getElementById("applyFilters")
+    .addEventListener("click", loadDashboard);
+
+
+// Reset filters
+document.getElementById("resetFilters")
+    .addEventListener("click", () => {
+
+        document.getElementById("brakeStatus").value = "all";
+        document.getElementById("startDate").value = "";
+        document.getElementById("endDate").value = "";
+
+        loadDashboard();
+    });
+
+
+// Initial load
 loadDashboard();
